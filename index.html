@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TMS Orientation System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700;800&family=Playfair+Display:wght@700;900&display=swap');
+        
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Sarabun', sans-serif; background: #f0f7ff; height: 100vh; overflow: hidden; }
+
+        .btn-action, .btn-login, .btn-acknowledge, .btn-quiz, .btn-cert { 
+            width: 100%; padding: 12px; border-radius: 12px; border: none; 
+            font-family: 'Sarabun', sans-serif; font-size: 16px; font-weight: bold; 
+            cursor: pointer; transition: 0.3s; background: #1a2b48; color: white;
+            margin-top: 10px; display: block; text-align: center; text-decoration: none;
+        }
+        .btn-action:hover, .btn-login:hover, .btn-acknowledge:hover {
+            background: #0288d1; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .btn-quiz { background: #fbc02d; color: #1a2b48; }
+        .btn-cert { background: #4caf50 !important; }
+
+        /* --- Header ปรับปรุงใหม่ --- */
+        .header { 
+            background: white; height: 65px; padding: 0 20px; display: none; 
+            justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1100;
+        }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header-logo-group { display: flex; align-items: center; gap: 10px; }
+        .header-logo-group img { height: 40px; }
+        .header-right { display: flex; align-items: center; gap: 15px; text-align: right; }
+        .user-info { line-height: 1.2; font-size: 13px; color: #666; }
+        .user-info b { font-size: 15px; color: #1a2b48; display: block; }
+        .menu-btn { background: #1a2b48; color: white; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+
+        /* Announcement */
+        #announcement-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 20, 40, 0.95); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+        .announcement-card { background: white; padding: 30px; border-radius: 25px; width: 90%; max-width: 600px; text-align: center; border-bottom: 8px solid #fbc02d; }
+        .announcement-list { text-align: left; background: #f9f9f9; padding: 15px; border-radius: 15px; margin: 15px 0; font-size: 14px; color: #333; }
+
+        /* Login */
+        #login-section { background: url('https://i.postimg.cc/bwS4z3v1/bg-sea.jpg') center/cover; display: none; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-card { background: rgba(255, 255, 255, 0.95); border-radius: 25px; padding: 30px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.2); }
+        .input-box, .select-box { width: 100%; padding: 12px; border-radius: 10px; border: 1.5px solid #ddd; margin-top: 5px; outline: none; font-family: 'Sarabun'; }
+
+        /* Sidebar & Content */
+        #training-page { display: none; height: calc(100vh - 65px); position: relative; overflow: hidden; }
+        .sidebar { width: 300px; background: #b3e5fc; padding: 20px; display: flex; flex-direction: column; position: absolute; left: -300px; top: 0; bottom: 0; transition: 0.3s; z-index: 1000; border-right: 1px solid #90caf9; }
+        .sidebar.active { left: 0; }
+        .main-content { flex-grow: 1; width: 100%; height: 100%; padding: 20px; background: #263238; overflow-y: auto; display: flex; flex-direction: column; align-items: center; transition: 0.3s; }
+        
+        @media (min-width: 1025px) { .main-content.shifted { margin-left: 300px; width: calc(100% - 300px); } }
+
+        .episode-item { padding: 12px; cursor: pointer; border-radius: 8px; margin-bottom: 5px; background: rgba(255,255,255,0.5); font-weight: bold; display: flex; justify-content: space-between; }
+        .episode-item.locked { cursor: not-allowed; opacity: 0.6; background: #cfd8dc; }
+        .episode-item.active { background: #1a2b48; color: white; }
+        .sub-item { padding: 5px 15px; cursor: pointer; font-size: 14px; border-left: 2px solid #1a2b48; margin-left: 10px; }
+        .sub-item.active-sub { color: #0288d1; font-weight: bold; }
+        .video-container { width: 100%; max-width: 850px; aspect-ratio: 16/9; background: #000; border-radius: 15px; overflow: hidden; }
+
+        .progress-container { margin-bottom: 20px; }
+        .progress-bar-bg { background: #e0e0e0; border-radius: 10px; height: 10px; overflow: hidden; }
+        .progress-bar-fill { background: #0288d1; height: 100%; width: 0%; transition: 0.5s; }
+        .progress-text { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; color: #1a2b48; font-weight: bold; }
+
+        #cert-template { position: absolute; left: -9999px; top: -9999px; width: 1123px; height: 794px; }
+        .cert-container { width: 1123px; height: 794px; position: relative; background: url('https://i.postimg.cc/PJDNnk9J/Gold-White-and-Blue-Elegant-Appreciation-Certificate-(2).png') center/cover no-repeat; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .cert-name-text { font-family: 'Playfair Display', serif; font-size: 45px; font-weight: 900; text-transform: uppercase; color: #1a2b48; margin-top: 50px; }
+/* --- เพิ่มเติมสำหรับการแสดงผลในมือถือและไอแพด --- */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 10px; /* ลดขอบข้างเพื่อเพิ่มพื้นที่ดูวิดีโอ */
+            }
+            #lesson-header h2 {
+                font-size: 18px; /* ปรับชื่อบทเรียนให้เล็กลงไม่ล้นจอ */
+            }
+            #sub-title {
+                font-size: 15px; /* ปรับชื่อหัวข้อย่อย */
+            }
+            .btn-action, .btn-login, .btn-acknowledge, .btn-quiz, .btn-cert {
+                padding: 10px;
+                font-size: 14px; /* ปรับขนาดปุ่มให้พอดีกับนิ้วมือ */
+            }
+            .video-container {
+                border-radius: 8px; /* ลดความโค้งของขอบวิดีโอบนจอเล็ก */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <script>
+        const SITE_PASSWORD = "TMS2026";
+        const DATABASE_URL = "https://script.google.com/macros/s/AKfycbwyAZMLgKTwjXMiZAhXXBx8S60BENZsUl_gCgRz2NcAt43bkoOCysjTgtqesSG_N-JSpQ/exec";
+        // ฟังก์ชันควบคุมการเปลี่ยนหน้า
+        function showLoginSection() { 
+            document.getElementById('announcement-modal').style.display = 'none'; 
+            document.getElementById('login-section').style.display = 'flex'; 
+        }
+
+        window.onload = function() {
+            let pass = "";
+            while (pass !== SITE_PASSWORD) {
+                pass = prompt("กรุณากรอกรหัสผ่านเพื่อเข้าใช้งานระบบ:");
+                if (pass === null) { document.body.innerHTML = "<h1>Access Denied</h1>"; break; }
+                if (pass !== SITE_PASSWORD) alert("รหัสผ่านไม่ถูกต้อง!");
+            }
+        };
+
+        window.onbeforeunload = function() {
+            if (document.getElementById('quiz-area').style.display === 'block') {
+                return "คุณกำลังทำข้อสอบอยู่ กรุณาทำข้อสอบให้เสร็จสิ้นก่อนออกจากระบบ";
+            }
+        };
+
+function showLoginSection() { 
+    document.getElementById('announcement-modal').style.display = 'none'; 
+    document.getElementById('login-section').style.display = 'flex'; 
+}
+    </script>
+
+    <div id="announcement-modal">
+        <div class="announcement-card">
+            <div style="background: #fff3cd; color: #856404; padding: 8px; border-radius: 10px; font-weight: bold; margin-bottom: 15px;">⚠️ Pilot Phase Announcement</div>
+            <img src="https://i.postimg.cc/50D0xrsS/logo.png" width="80">
+            <h2 style="color:#1a2b48;">คำชี้แจงการใช้งานระบบ</h2>
+            <div class="announcement-list">
+                <p style="text-indent: 20px; color: #2c3e50; font-weight: 500;">
+                    ระบบนี้อยู่ระหว่างการ<b>ทดลองใช้งาน (Pilot Phase)</b> โดยเนื้อหาวิดีโอบางส่วนอาจยังไม่สมบูรณ์ครบถ้วน 
+                    จึงขอความร่วมมือจากผู้ใช้งานในการทดลองใช้ระบบ พร้อมทั้งให้ข้อเสนอแนะและความคิดเห็น เพื่อนำไปปรับปรุงต่อไป
+                </p>
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+                <ul style="font-size: 14px; color: #555;">
+                    <li>กรอกชื่อ-นามสกุล เป็น <b>ภาษาอังกฤษตัวพิมพ์ใหญ่</b></li>
+                    <li>เกณฑ์การผ่านแบบทดสอบคือ <b>85%</b></li>
+                    <li>เมื่อเรียนจบครบทุกบท สามารถกดรับเกียรติบัตรได้ทันที(แบบทดลอง)</li>
+                </ul>
+            </div>
+            <button class="btn-acknowledge" onclick="showLoginSection()">รับทราบและเข้าสู่ระบบ</button>
+        </div>
+    </div>
+
+    <div id="login-section">
+        <div class="login-card">
+            <img src="https://i.postimg.cc/50D0xrsS/logo.png" width="100">
+            <h2 style="color:#1a2b48; margin-bottom: 25px; font-weight: 800;">TMS Orientation</h2>
+            <div style="text-align:left; margin-bottom:15px;">
+                <label style="font-weight:bold; color:#1a2b48; display:block; margin-bottom:5px;">ชื่อ-นามสกุล (ENGLISH ONLY)</label>
+                <input type="text" id="username" class="input-box" placeholder="e.g. SOMJAI SOMDEE">
+            </div>
+            <div style="text-align:left; margin-bottom:20px;">
+                <label style="font-weight:bold; color:#1a2b48; display:block; margin-bottom:5px;">ตำแหน่ง (Position)</label>
+                <select id="userposition" class="select-box">
+                    <option value="">-- โปรดเลือกตำแหน่ง --</option>
+                    <option value="BARGE MASTER">BARGE MASTER</option>
+                    <option value="MASTER">MASTER</option>
+                    <option value="CHIEF OFFICER">CHIEF OFFICER</option>
+                    <option value="CHIEF ENGINEER">CHIEF ENGINEER</option>
+                    <option value="SECOND  ENGINEER">SECOND  ENGINEER</option>
+                    <option value="SAFETY OFFICER">SAFETY OFFICER</option>
+                    <option value="RADIO OPERTOR">RADIO OPERTOR</option>
+                    <option value="CRANE OPERATOR">CRANE OPERATOR</option>
+                    <option value="BOSUN">BOSUN</option>
+                    <option value="ASST.BOSUN">ASST.BOSUN</option>
+                    <option value="DECK HELPER">DECK HELPER</option>
+                    <option value="ELECTRICIAN">ELECTRICIAN</option>
+                    <option value="ELECTRICIAN">ELECTRICIAN</option>
+                    <option value="FITTER">FITTER</option>
+                    <option value="ABLE SEAMAN">ABLE SEAMAN</option>
+                    <option value="OILER">OILER</option>
+                    <option value="OFFICE STAFF">OFFICE STAFF</option>
+                    </select>
+            </div>
+            <button type="button" onclick="enterTraining()" class="btn-login">เข้าสู่ระบบ</button>
+        </div>
+    </div>
+
+    <header id="main-header" class="header">
+        <div class="header-left">
+            <button class="menu-btn" onclick="toggleSidebar()">☰ เมนูเรียน</button>
+            <div class="header-logo-group">
+                <img src="https://i.postimg.cc/50D0xrsS/logo.png">
+                <div>
+                    <h2 style="margin:0; font-size:15px;">Truth Maritime Services</h2>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                ยินดีต้อนรับ
+                <b><span id="display-name"></span></b>
+            </div>
+            <img src="https://cdn-icons-png.flaticon.com/512/182/182448.png" width="28" style="cursor:pointer" onclick="logout()" title="ออกจากระบบ">
+        </div>
+    </header>
+
+    <div id="training-page">
+        <div class="sidebar">
+            <div class="progress-container">
+                <div class="progress-text"><span>ความคืบหน้า</span><span id="prog-percent">0%</span></div>
+                <div class="progress-bar-bg"><div id="prog-fill" class="progress-bar-fill"></div></div>
+            </div>
+            <div id="side-items"></div>
+            <button class="btn-action" style="margin-top:20px; background:white; color:#1a2b48; border:1px solid #1a2b48;" onclick="toggleScoreModal(true)">📊 คะแนนสะสม</button>
+        </div>
+
+        <main class="main-content">
+            <div id="lesson-header" style="text-align: center; width: 100%;">
+                <h2 id="content-title" style="color:white; margin-bottom:5px;"></h2>
+                <p id="sub-title" style="color:#fbc02d; font-size:18px; margin-top:0; font-weight:bold;"></p>
+            </div>
+            <div id="video-area" class="video-container">
+                <iframe id="videoPlayer" src="" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>
+            </div>
+            <div id="quiz-area" style="display:none; background:white; padding:25px; border-radius:15px; width:100%; max-width:850px; margin-top:20px;">
+                <h2 style="text-align:center;">แบบทดสอบท้ายบท</h2><hr>
+                <div id="quiz-questions"></div>
+                <button class="btn-action" onclick="submitQuiz()">ส่งแบบทดสอบ</button>
+            </div>
+            <div id="passed-area" style="display:none; text-align:center; background:white; padding:40px; border-radius:20px; width:100%; max-width:600px; margin-top:20px;">
+    <h1 id="passed-status-title">🎉 ผ่านการอบรม!</h1>
+    <p id="score-result" style="font-size:24px; font-weight:bold;"></p>
+    <button id="next-btn-passed" class="btn-action" onclick="goNextLesson()">เริ่มบทถัดไป</button>
+    <button id="retry-btn" class="btn-action" style="background:#f44336; display:none;" onclick="rewatchVideo()">ลองใหม่อีกครั้ง</button>
+    <button id="cert-btn" class="btn-action btn-cert" style="display:none;" onclick="downloadCert()">ดาวน์โหลดเกียรติบัตร 🎓</button>
+    
+    <a id="feedback-btn" href="https://forms.office.com/Pages/ResponsePage.aspx?id=a2FdX4nDG0KCzdV7WUE_2m2IwzCWvphFuyz0wRMfS4tUQTNMSTNMMU1aOFlYSUZONFI4SEtNSkVTQi4u" target="_blank" class="btn-action" style="display:none; background:#ff5722 !important; margin-top:15px;">
+    ⭐ ประเมินความพึงพอใจระบบ
+</a>
+    <div id="quiz-review" style="display:none; text-align:left; margin-top:25px; padding:20px; background:#f9f9f9; border-radius:15px; border:1px solid #ddd; max-height:300px; overflow-y:auto;">
+        <h3 style="color:#1a2b48; border-bottom:2px solid #1a2b48; padding-bottom:5px;">🔍 เฉลยคำตอบที่ถูกต้อง</h3>
+        <div id="review-list"></div>
+    </div>
+</div>
+            <div id="control-area" style="display:flex; gap:10px; width:100%; max-width:850px; margin-top:15px;">
+                <button id="v-prev" class="btn-action" style="background:#546e7a" onclick="changeVideo(-1)">ก่อนหน้า</button>
+                <button id="v-next" class="btn-action" onclick="changeVideo(1)">ถัดไป</button>
+                <button id="q-start" class="btn-action btn-quiz" style="display:none;" onclick="showQuiz()">เริ่มทำแบบทดสอบ</button>
+            </div>
+        </main>
+    </div>
+
+    <div id="cert-template"></div>
+
+    <div id="score-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:3000; justify-content:center; align-items:center; padding:20px;">
+        <div style="background:white; padding:30px; border-radius:20px; width:100%; max-width:450px; text-align:center; position:relative;">
+            <button onclick="toggleScoreModal(false)" style="position:absolute; top:15px; right:15px; border:none; background:none; font-size:24px; cursor:pointer;">&times;</button>
+            <h2 style="color:#1a2b48; margin-bottom:20px;">📊 คะแนนสะสมของคุณ</h2>
+            <div id="score-board" style="text-align:left; margin-bottom:20px;">
+                </div>
+            <button class="btn-action" onclick="toggleScoreModal(false)">ปิดหน้าต่าง</button>
+        </div>
+    </div>
+
+    <script>
+        const lessons = [
+            { id: 1, name: "แนะนำบริษัท", subTopics: ["แนะนำบริษัท"], videos: ["https://www.youtube.com/embed/frlCytwq8to"], fullScore: 10 },
+            { id: 2, name: "ความรู้ความปลอดภัย", subTopics: ["Hierarchy of Controls", "การรายงาน SOC", "ประเมินความเสี่ยง", "Control of Work"], videos: ["https://www.youtube.com/embed/l_sM6LzxxEI","https://www.youtube.com/embed/irTH9Shb8yE","https://www.youtube.com/embed/DVxd2qkQmrk","https://www.youtube.com/embed/KRVi-RkINUo"], fullScore: 20 },
+            { id: 3, name: "กฎหมายความปลอดภัย", subTopics: ["หน้าที่นายจ้าง/ลูกจ้าง"], videos: ["https://www.youtube.com/embed/iy4rNP4zGpE"], fullScore: 20 },
+            { id: 4, name: "คู่มือความปลอดภัย", subTopics: ["วิดีโอคู่มือ"], videos: ["https://www.youtube.com/embed/c2n-i882jas"], fullScore: 20 }
+        ];
+    const quizData = {
+        1: [ // ตอนที่ 1: แนะนำบริษัท & เรื่องทั่วไป
+            { q: "สีประจำบริษัท TMS คือสีอะไร? (อ้างอิงจากโลโก้)", a: ["ส้ม-ขาว", "น้ำเงิน-ขาว-เหลืองทอง", "เขียว-ดำ", "ชมพู-เทา"], c: 0 },
+            { q: "เรือ ที เอ็ม เอส จะนะ เป็นเรือประเภทใด?", a: ["เรือสำราญ", "เรือหางยาว", "เรือ Crew Boat", "เรือดำน้ำ"], c: 2 },
+            { q: "ชื่อย่อของบริษัท Truth Maritime Services คืออะไร?", a: ["TTS", "TMS", "TRU", "MMS"], c: 1 },
+            { q: "พนักงานใหม่ต้องทำสิ่งใดเป็นอันดับแรกเมื่อเข้าทำงาน?", a: ["ไปนอน", "รับการปฐมเทศนาและอบรมความปลอดภัย", "ออกเรือทันที", "กลับบ้าน"], c: 1 },
+            { q: "การอบรมนี้มีจุดประสงค์เพื่ออะไร?", a: ["เพื่อความสวยงาม", "เพื่อให้ทำงานได้อย่างปลอดภัย", "เพื่อความสนุกสนาน", "เพื่อสะสมแต้ม"], c: 1 },
+            { q: "TMS มีความเชี่ยวชาญด้านการขนส่งทางใด?", a: ["ทางอากาศ", "ทางน้ำ/ทะเล", "ทางบก", "ทางรถไฟ"], c: 1 },
+            { q: "ข้อใดคือชื่อเรือในกลุ่มบริษัท?", a: ["ไททานิค", "ที เอ็ม เอส จะนะ", "เรือเมล์", "เรือกอนโดลา"], c: 1 },
+            { q: "การทำงานบนเรือต้องให้ความสำคัญกับสิ่งใดมากที่สุด?", a: ["การแต่งหน้า", "ความปลอดภัย (Safety)", "ความเร็วอย่างเดียว", "การตกปลา"], c: 1 },
+            { q: "พนักงานควรสวมใส่ชุดอะไรขณะปฏิบัติงานบนเรือ?", a: ["ชุดนอน", "ชุด PPE / ชุดหมีตามระเบียบ", "ชุดว่ายน้ำ", "ชุดราตรี"], c: 1 },
+            { q: "หากพบเหตุฉุกเฉินบนเรือควรทำอย่างไร?", a: ["ยืนดู", "รีบแจ้งหัวหน้างานหรือผู้ควบคุมเรือ", "กระโดดน้ำทันที", "ถ่ายรูปเช็คอิน"], c: 1 }
+        ],
+        2: [ // ตอนที่ 2: ความรู้ความปลอดภัย
+            { q: "เครื่องหมาย PPE ย่อมาจากอะไร?", a: ["Personal Power Equipment", "Personal Protective Equipment", "People Play Easy", "Professional Part Exit"], c: 1 },
+            { q: "สีเหลืองในป้ายความปลอดภัยหมายถึงอะไร?", a: ["บังคับปฏิบัติ", "เตือน/ระวังอันตราย", "ปลอดภัย", "หยุด/ห้าม"], c: 1 },
+            { q: "หากต้องเข้าพื้นที่ที่มีเสียงดังควรสวมใส่อุปกรณ์ใด?", a: ["แว่นตา", "ที่อุดหู (Earplugs)", "ผ้าปิดจมูก", "ถุงมือ"], c: 1 },
+            { q: "หมวกนิรภัยมีไว้เพื่อป้องกันอะไร?", a: ["ป้องกันแดด", "ป้องกันแรงกระแทกที่ศีรษะ", "ป้องกันผมเสียทรง", "ป้องกันฝน"], c: 1 },
+            { q: "ก่อนเริ่มงานทุกครั้งควรมีการทำสิ่งใด?", a: ["T-Box Talk / ประชุมความปลอดภัย", "กินข้าว", "นอนพัก", "เล่นเกม"], c: 0 },
+            { q: "ป้ายวงกลมสีน้ำเงิน หมายถึงอะไร?", a: ["ป้ายห้าม", "ป้ายบังคับให้ปฏิบัติ", "ป้ายเตือน", "ป้ายทางหนีไฟ"], c: 1 },
+            { q: "การยกของหนักที่ถูกต้องควรทำอย่างไร?", a: ["ก้มหลังยก", "ย่อเข่าและใช้กำลังขา", "ใช้มือเดียวหิ้ว", "โยน"], c: 1 },
+            { q: "SOC Card มีไว้เพื่ออะไร?", a: ["บัตรเติมเงิน", "บันทึกการสังเกตความปลอดภัย", "บัตรพนักงาน", "นามบัตร"], c: 1 },
+            { q: "ความปลอดภัยเริ่มต้นที่ใคร?", a: ["หัวหน้างาน", "จป.", "ตัวเอง", "เพื่อนข้างบ้าน"], c: 2 },
+            { q: "หากพบน้ำมันหกบนพื้นเรือควรทำอย่างไร?", a: ["เดินผ่านไป", "ทำความสะอาดและกั้นเขตทันที", "รอให้แห้งเอง", "เทน้ำซ้ำ"], c: 1 }
+        ],
+        3: [ // ตอนที่ 3: กฎหมายและสิทธิ
+            { q: "นายจ้างต้องจัดอุปกรณ์ความปลอดภัย (PPE) ให้ลูกจ้างอย่างไร?", a: ["ขายให้", "จัดหาให้ฟรี", "ให้ยืมแล้วหักเงิน", "ให้พนักงานหามาเอง"], c: 1 },
+            { q: "ลูกจ้างมีหน้าที่อย่างไรเกี่ยวกับความปลอดภัย?", a: ["ไม่ต้องทำอะไร", "ปฏิบัติตามกฎระเบียบอย่างเคร่งครัด", "ทำบ้างไม่ทำบ้าง", "ลาออก"], c: 1 },
+            { q: "หากได้รับบาดเจ็บจากการทำงานต้องแจ้งใคร?", a: ["ไม่บอกใคร", "แจ้งหัวหน้างานทันที", "ไปหาหมอเองเงียบๆ", "โพสต์ลงโซเชียล"], c: 1 },
+            { q: "จป. ย่อมาจากคำว่าอะไร?", a: ["เจ้าหน้าที่ประปา", "เจ้าหน้าที่ความปลอดภัยในการทำงาน", "เจ้านายประจำเป็น", "เจ้าของโปรเจกต์"], c: 1 },
+            { q: "พนักงานมีสิทธิ 'หยุดทำงาน' (Stop Work) ได้เมื่อใด?", a: ["เมื่อขี้เกียจ", "เมื่อพบว่างานนั้นไม่ปลอดภัย", "เมื่อหิวข้าว", "เมื่ออากาศร้อน"], c: 1 },
+            { q: "ป้ายสีเขียวในโรงงานหรือเรือมักหมายถึงอะไร?", a: ["จุดอันตราย", "ปฐมพยาบาล/ทางหนีไฟ", "เขตสูบบุหรี่", "ที่เก็บขยะ"], c: 1 },
+            { q: "การทำงานล่วงเวลา (OT) ต้องเป็นไปตามกฎหมายใด?", a: ["กฎหมายแพ่ง", "พรบ.คุ้มครองแรงงาน", "กฎหมายอาญา", "กฎหมายจราจร"], c: 1 },
+            { q: "วันหยุดประจำสัปดาห์ตามกฎหมายต้องมีอย่างน้อยกี่วัน?", a: ["0 วัน", "1 วัน", "3 วัน", "5 วัน"], c: 1 },
+            { q: "การปฐมพยาบาลเบื้องต้นเป็นหน้าที่ของใคร?", a: ["หมอเท่านั้น", "ทุกคนที่ผ่านการอบรม", "ยาม", "คนขับรถ"], c: 1 },
+            { q: "กฎระเบียบความปลอดภัยมีไว้เพื่อใคร?", a: ["บริษัท", "พนักงานทุกคน", "จป.", "ตำรวจ"], c: 1 }
+        ],
+        4: [ // ตอนที่ 4: สุขอนามัยและสิ่งแวดล้อม
+            { q: "ขยะอันตรายควรทิ้งในถังสีอะไร?", a: ["เขียว", "แดง", "เหลือง", "น้ำเงิน"], c: 1 },
+            { q: "ก่อนรับประทานอาหารควรทำอย่างไร?", a: ["ล้างมือให้สะอาด", "นอน", "ทำงานต่อ", "เล่นโทรศัพท์"], c: 0 },
+            { q: "การแยกขยะมีประโยชน์อย่างไร?", a: ["ทำให้ถังขยะเต็มช้า", "ช่วยรักษาสิ่งแวดล้อมและรีไซเคิลได้", "เปลืองเวลา", "เท่"], c: 1 },
+            { q: "โรคติดต่อที่ป้องกันได้ด้วยการสวมหน้ากากคือโรคอะไร?", a: ["ปวดหัว", "ไข้หวัด/โควิด-19", "ปวดหลัง", "ท้องเสีย"], c: 1 },
+            { q: "การสูบบุหรี่บนเรือควรทำที่ใด?", a: ["ในห้องนอน", "ในห้องเครื่อง", "บริเวณที่จัดไว้ให้เท่านั้น", "ที่ไหนก็ได้"], c: 2 },
+            { q: "น้ำเสียบนเรือควรจัดการอย่างไร?", a: ["เทลงทะเลทันที", "บำบัดหรือเก็บลงถังเก็บน้ำเสียตามระเบียบ", "เทลงพื้นเรือ", "เก็บใส่ขวดทิ้งขยะ"], c: 1 },
+            { q: "การดื่มแอลกอฮอล์ขณะปฏิบัติหน้าที่บนเรือมีโทษอย่างไร?", a: ["ไม่มีความผิด", "ผิดระเบียบร้ายแรงและอาจถูกเลิกจ้าง", "แค่ตักเตือน", "ให้ดื่มต่อได้"], c: 1 },
+            { q: "การนอนหลับพักผ่อนให้เพียงพอส่งผลอย่างไรต่อการทำงาน?", a: ["ทำให้ง่วงกว่าเดิม", "เพิ่มสมาธิและลดอุบัติเหตุ", "ไม่มีผล", "ทำให้ทำงานช้าลง"], c: 1 },
+            { q: "หากพบหนูหรือแมลงสาบในห้องอาหารเรือควรทำอย่างไร?", a: ["เลี้ยงไว้", "แจ้งฝ่ายบริการหรือผู้ดูแลเพื่อกำจัด", "ปล่อยไป", "ตั้งชื่อให้"], c: 1 },
+            { q: "การรักษาความสะอาดในที่พักอาศัยบนเรือเป็นหน้าที่ของใคร?", a: ["แม่บ้านเท่านั้น", "พนักงานทุกคนที่พักอาศัย", "กัปตัน", "วิศวกร"], c: 1 }
+        ]
+    };
+        let currentUser = "", currentPos = "", currentLessonIdx = 0, currentVideoIdx = 0;
+        let scores = { 1: null, 2: null, 3: null, 4: null };
+
+        // ฟังก์ชันดึงข้อมูลที่เคยเรียนค้างไว้
+        function loadProgress() {
+            const savedData = localStorage.getItem(`TMS_Progress_${currentUser}_${currentPos}`);
+            if (savedData) {
+                const progress = JSON.parse(savedData);
+                currentLessonIdx = progress.lessonIdx;
+                currentVideoIdx = progress.videoIdx;
+                scores = progress.scores;
+                return true;
+            }
+            return false;
+        }
+
+        function saveLastProgress() {
+            if (currentUser) {
+                const progress = {
+                    lessonIdx: currentLessonIdx,
+                    videoIdx: currentVideoIdx,
+                    scores: scores
+                };
+                // เก็บข้อมูลโดยใช้ชื่อ+ตำแหน่งเป็น Key เพื่อป้องกันคนชื่อซ้ำแต่คนละตำแหน่ง
+                localStorage.setItem(`TMS_Progress_${currentUser}_${currentPos}`, JSON.stringify(progress));
+            }
+        }
+
+        function enterTraining() {
+            const name = document.getElementById('username').value.trim().toUpperCase();
+            const pos = document.getElementById('userposition').value;
+            if(!name || !pos) return alert("กรุณากรอกข้อมูลให้ครบ");
+            
+            currentUser = name; 
+            currentPos = pos;
+            
+            // --- เพิ่มการเช็คข้อมูลเก่าตรงนี้ ---
+            const hasProgress = loadProgress();
+            if (hasProgress) {
+                alert(`ยินดีต้อนรับกลับมาครับคุณ ${currentUser}\nระบบจะพาคุณไปยังบทเรียนที่คุณทำค้างไว้ล่าสุด`);
+            }
+            // -----------------------------
+
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('main-header').style.display = 'flex';
+            document.getElementById('training-page').style.display = 'flex';
+            document.getElementById('display-name').innerText = currentUser;
+            
+            updateVideoUI(); 
+        }
+
+        function updateVideoUI() {
+            const L = lessons[currentLessonIdx];
+            document.getElementById('videoPlayer').src = L.videos[currentVideoIdx];
+            document.getElementById('content-title').innerText = L.name;
+            document.getElementById('sub-title').innerText = L.subTopics[currentVideoIdx];
+            const isLast = currentVideoIdx === L.videos.length - 1;
+            document.getElementById('v-next').style.display = isLast ? 'none' : 'block';
+            document.getElementById('q-start').style.display = isLast ? 'block' : 'none';
+            document.getElementById('v-prev').style.visibility = currentVideoIdx === 0 ? 'hidden' : 'visible';
+            
+            saveLastProgress(); // <--- เพิ่มบรรทัดนี้เพื่อบันทึกตำแหน่งล่าสุด
+            renderSidebar();
+        }
+
+        function renderSidebar() {
+            const cont = document.getElementById('side-items');
+            cont.innerHTML = "";
+            lessons.forEach((l, idx) => {
+                const isLocked = idx > 0 && scores[lessons[idx-1].id] === null;
+                const item = document.createElement('div');
+                item.className = `episode-item ${idx === currentLessonIdx ? 'active' : ''} ${isLocked ? 'locked' : ''}`;
+                item.innerHTML = `<span>ตอนที่ ${l.id}: ${l.name}</span> ${isLocked ? '🔒' : ''}`;
+                if(!isLocked) { item.onclick = () => loadLesson(idx); }
+                cont.appendChild(item);
+                if(idx === currentLessonIdx) {
+                    l.subTopics.forEach((s, sIdx) => {
+                        const sub = document.createElement('div');
+                        sub.className = `sub-item ${sIdx === currentVideoIdx ? 'active-sub' : ''}`;
+                        sub.innerText = s;
+                        sub.onclick = (e) => { e.stopPropagation(); currentVideoIdx = sIdx; updateVideoUI(); };
+                        cont.appendChild(sub);
+                    });
+                }
+            });
+            updateProgress();
+        }
+
+        function changeVideo(dir) {
+            currentVideoIdx += dir;
+            updateVideoUI();
+        }
+
+        function loadLesson(idx) {
+            currentLessonIdx = idx; currentVideoIdx = 0;
+            document.getElementById('quiz-area').style.display = 'none';
+            document.getElementById('passed-area').style.display = 'none';
+            document.getElementById('video-area').style.display = 'block';
+            document.getElementById('control-area').style.display = 'flex';
+            updateVideoUI();
+            document.getElementById('quiz-review').style.display = 'none';
+        }
+
+        function updateProgress() {
+            const done = Object.values(scores).filter(s => s !== null).length;
+            const p = (done / lessons.length) * 100;
+            document.getElementById('prog-percent').innerText = Math.round(p) + "%";
+            document.getElementById('prog-fill').style.width = p + "%";
+        }
+
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('active');
+            if(window.innerWidth > 1024) document.querySelector('.main-content').classList.toggle('shifted');
+        }
+
+        function showQuiz() {
+            const quizArea = document.getElementById('quiz-questions');
+            const currentQuestions = quizData[lessons[currentLessonIdx].id];
+            quizArea.innerHTML = "";
+            currentQuestions.forEach((item, qIdx) => {
+                const qDiv = document.createElement('div');
+                qDiv.style.marginBottom = "20px";
+                qDiv.innerHTML = `<p style="font-weight:bold;">${qIdx + 1}. ${item.q}</p>
+                    ${item.a.map((ans, aIdx) => `
+                        <label style="display:block; margin-bottom:5px; cursor:pointer;">
+                            <input type="radio" name="q${qIdx}" value="${aIdx}"> ${ans}
+                        </label>`).join('')}`;
+                quizArea.appendChild(qDiv);
+            });
+            document.getElementById('video-area').style.display = 'none';
+            document.getElementById('control-area').style.display = 'none';
+            document.getElementById('quiz-area').style.display = 'block';
+        }
+
+        function submitQuiz() {
+    const currentQuestions = quizData[lessons[currentLessonIdx].id];
+    let correctAnswers = 0; // นับจำนวนข้อที่ตอบถูกจริง
+    let reviewHtml = ""; 
+
+    currentQuestions.forEach((item, qIdx) => {
+        const sel = document.querySelector(`input[name="q${qIdx}"]:checked`);
+        const isCorrect = sel && parseInt(sel.value) === item.c;
+        if (isCorrect) correctAnswers++;
+
+        reviewHtml += `
+            <div style="margin-bottom:15px; padding:10px; border-left:4px solid ${isCorrect ? '#4caf50' : '#f44336'}; background:white;">
+                <p style="margin:0; font-weight:bold;">ข้อที่ ${qIdx + 1}: ${item.q}</p>
+                <p style="margin:5px 0 0; color:#4caf50;">✅ คำตอบที่ถูกต้อง: ${item.a[item.c]}</p>
+            </div>
+        `;
+    });
+
+    // --- ส่วนคำนวณคะแนนถ่วงน้ำหนักตามที่คุณต้องการ ---
+    let userScore = 0;
+    if (lessons[currentLessonIdx].id === 1) {
+        userScore = correctAnswers * 1; // ตอนที่ 1: ข้อละ 1 คะแนน (เต็ม 10)
+    } else {
+        userScore = correctAnswers * 2; // ตอนที่ 2, 3, 4: ข้อละ 2 คะแนน (เต็ม 20)
+    }
+    // ---------------------------------------------
+
+    const maxScore = lessons[currentLessonIdx].fullScore; // ดึงค่า 10 หรือ 20 จากตัวแปร lessons
+    const percent = (userScore / maxScore) * 100;
+
+    document.getElementById('quiz-area').style.display = 'none';
+    document.getElementById('passed-area').style.display = 'block';
+
+    const reviewArea = document.getElementById('quiz-review');
+    const reviewList = document.getElementById('review-list');
+
+    if (percent >= 85) {
+        scores[lessons[currentLessonIdx].id] = userScore; 
+        saveDataToSheets();
+
+        document.getElementById('passed-status-title').innerText = "🎉 ผ่านการอบรม!";
+        document.getElementById('score-result').innerText = `คะแนน: ${percent}% (${userScore}/${maxScore})`;
+        document.getElementById('score-result').style.color = "#4caf50";
+        document.getElementById('next-btn-passed').style.display = (currentLessonIdx === lessons.length - 1) ? 'none' : 'block';
+        document.getElementById('retry-btn').style.display = 'none';
+
+        reviewArea.style.display = 'block';
+        reviewList.innerHTML = reviewHtml;
+
+        if (currentLessonIdx === lessons.length - 1) document.getElementById('cert-btn').style.display = 'block';
+    } else {
+        document.getElementById('passed-status-title').innerText = "❌ ไม่ผ่านเกณฑ์ (85%)";
+        document.getElementById('score-result').innerText = `คะแนน: ${percent}% (${userScore}/${maxScore})`;
+        document.getElementById('score-result').style.color = "#f44336";
+        document.getElementById('next-btn-passed').style.display = 'none';
+        document.getElementById('retry-btn').style.display = 'block';
+        reviewArea.style.display = 'none';
+    }
+    renderSidebar();
+}
+
+        function rewatchVideo() {
+            document.getElementById('passed-area').style.display = 'none';
+            document.getElementById('video-area').style.display = 'block';
+            document.getElementById('control-area').style.display = 'flex';
+        }
+        function goNextLesson() {
+            currentLessonIdx++; currentVideoIdx = 0;
+            document.getElementById('passed-area').style.display = 'none';
+            document.getElementById('video-area').style.display = 'block';
+            document.getElementById('control-area').style.display = 'flex';
+            updateVideoUI();
+            document.getElementById('quiz-review').style.display = 'none';
+        }
+
+        async function downloadCert() {
+            const btn = document.getElementById('cert-btn');
+            const feedbackBtn = document.getElementById('feedback-btn');
+            btn.innerText = "กำลังสร้างไฟล์... ⏳"; btn.disabled = true;
+            const certTemplate = document.getElementById('cert-template');
+            certTemplate.style.left = "0"; certTemplate.style.top = "0";
+            certTemplate.innerHTML = `
+                <div class="cert-container">
+                    <div class="cert-name-text">${currentUser}</div>
+                    <div style="margin-top:25px; font-size:24px; color:#1a2b48; font-weight:bold; text-align:center; width:80%;">
+                        HAS SUCCESSFULLY COMPLETED THE SAFETY ORIENTATION FOR<br>
+                        <span style="font-size:30px; color:#0288d1;">${currentPos}</span>
+                    </div>
+                    <div style="margin-top:30px; font-size:18px; color:#555;">Issued on ${new Date().toLocaleDateString('en-GB')}</div>
+                </div>`;
+            try {
+                await new Promise(res => setTimeout(res, 1000));
+                const canvas = await html2canvas(certTemplate, { useCORS: true, scale: 2 });
+                const link = document.createElement('a');
+                link.download = `TMS_Certificate_${currentUser}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                setTimeout(() => { feedbackBtn.style.display = 'block'; }, 1000); 
+            } catch (e) { alert("เกิดข้อผิดพลาดในการสร้างไฟล์"); }
+            finally { certTemplate.style.left = "-9999px"; btn.innerText = "ดาวน์โหลดเรียบร้อย ✅"; btn.disabled = false; }
+        }
+
+        function saveDataToSheets() {
+    let s1 = scores[1] || 0;
+    let s2 = scores[2] || 0;
+    let s3 = scores[3] || 0;
+    let s4 = scores[4] || 0;
+    let totalScore = s1 + s2 + s3 + s4;
+
+    let completedCount = Object.values(scores).filter(s => s !== null).length;
+    let status = (completedCount === 4) ? "PASS" : "LEARNING";
+
+    const data = {
+        name: currentUser,
+        pos: currentPos, // เปลี่ยนจาก position เป็น pos ให้ตรงกับ Script
+        s1: s1,
+        s2: s2,
+        s3: s3,
+        s4: s4,
+        total: totalScore,
+        progress: Math.round((completedCount / 4) * 100) + "%",
+        status: status,
+        action: "SAVE_SCORE" // เพิ่ม action เพื่อแยกแยะการทำงาน
+    };
+
+    fetch(DATABASE_URL, {
+        method: "POST",
+        mode: "no-cors",
+        cache: "no-cache",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    })
+    .then(() => console.log("บันทึก/อัปเดตข้อมูลเรียบร้อย"))
+    .catch(err => console.error("Error:", err));
+}
+
+        function logout() { 
+    if(confirm("ออกจากระบบ? ระบบจะบันทึกความคืบหน้าล่าสุดของคุณไว้")) {
+        saveLastProgress(); // บันทึกในคอมพิวเตอร์เครื่องนี้
+        saveDataToSheets(); // ส่งข้อมูลไปอัปเดตทับแถวเดิมใน Google Sheets
+        setTimeout(() => { location.reload(); }, 500); // รอส่งข้อมูลแป๊บนึงแล้วค่อยรีโหลด
+    }
+}
+
+        function toggleScoreModal(show) {
+    const modal = document.getElementById('score-modal');
+    const board = document.getElementById('score-board');
+    
+    if (show) {
+        let html = "";
+        lessons.forEach(l => {
+            const score = scores[l.id];
+            const scoreText = (score !== null) ? `<b style="color:#4caf50;">${score} คะแนน (ผ่าน)</b>` : `<i style="color:#999;">ยังไม่ได้รับคะแนน</i>`;
+            html += `
+                <div style="padding:12px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <span>ตอนที่ ${l.id}: ${l.name}</span>
+                    <span>${scoreText}</span>
+                </div>`;
+        });
+        
+        // คำนวณคะแนนรวม
+        const total = Object.values(scores).reduce((a, b) => a + (b || 0), 0);
+        html += `<div style="padding:15px; background:#f0f7ff; margin-top:10px; border-radius:10px; font-weight:bold; display:flex; justify-content:space-between;">
+                    <span>คะแนนรวมทั้งหมด:</span>
+                    <span style="color:#1a2b48;">${total} คะแนน</span>
+                 </div>`;
+        
+        board.innerHTML = html;
+        modal.style.display = 'flex';
+    } else {
+        modal.style.display = 'none';
+    }
+}
+    </script>
+</body>
+</html>
